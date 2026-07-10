@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS sale_items;
+DROP TABLE IF EXISTS sales;
+DROP TABLE IF EXISTS ingredient_purchases;
+DROP TABLE IF EXISTS item_ingredients;
+DROP TABLE IF EXISTS items;
+DROP TABLE IF EXISTS ingredients;
+DROP TABLE IF EXISTS users;

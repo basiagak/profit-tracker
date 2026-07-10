@@ -1,0 +1,762 @@
+openapi: 3.0.3
+info:
+  title: Shop Profit Tracking API
+  version: "1.0.0"
+  description: >
+    JSON-only REST API for the Shop Profit Tracking dashboard backend. No HTML/view layer
+    is served by this API (see research.md §1); any UI that consumes this contract is a
+    separate, out-of-scope client. Every scoped resource is implicitly filtered to the
+    authenticated caller's shop (FR-002); cross-shop access to an existing resource
+    returns 404, never 403 (FR-002, SC-007). All monetary/quantity fields are encoded as
+    decimal strings, never JSON numbers (FR-020) — see the `DecimalString` schema.
+servers:
+  - url: http://localhost:8080/api
+    description: Local development
+
+security:
+  - sessionCookie: []
+
+tags:
+  - name: auth
+  - name: ingredients
+  - name: items
+  - name: purchases
+  - name: sales
+  - name: reports
+
+paths:
+  /auth/telegram:
+    post:
+      tags: [auth]
+      summary: Verify a Telegram Login Widget payload and establish a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramAuthRequest'
+      responses:
+        '200':
+          description: Authenticated; session cookie set via Set-Cookie
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid Telegram signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Clear the current session
+      responses:
+        '204':
+          description: Logged out
+
+  /me:
+    get:
+      tags: [auth]
+      summary: Get the authenticated user
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /ingredients:
+    get:
+      tags: [ingredients]
+      summary: List ingredients for the authenticated shop
+      parameters:
+        - name: include_archived
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Ingredient list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ingredient'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    post:
+      tags: [ingredients]
+      summary: Create an ingredient (FR-003)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngredientCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '409':
+          description: Duplicate active ingredient name for this shop
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /ingredients/{id}:
+    patch:
+      tags: [ingredients]
+      summary: Update an ingredient's name/unit (FR-003)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngredientUpdate'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ingredients/{id}/archive:
+    post:
+      tags: [ingredients]
+      summary: Archive or unarchive an ingredient (FR-005)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [archived]
+              properties:
+                archived:
+                  type: boolean
+      responses:
+        '200':
+          description: >
+            Updated ingredient. May include `warnings` if archiving while still referenced
+            by an active item recipe (data-model.md Edge Cases) — archiving still succeeds.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Ingredient'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /items:
+    get:
+      tags: [items]
+      summary: List menu items for the authenticated shop
+      parameters:
+        - name: include_archived
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Item list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+    post:
+      tags: [items]
+      summary: Create a menu item (FR-004)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /items/{id}:
+    patch:
+      tags: [items]
+      summary: Update an item's name/price (FR-004)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemUpdate'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /items/{id}/archive:
+    post:
+      tags: [items]
+      summary: Archive or unarchive an item (FR-005)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [archived]
+              properties:
+                archived:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /items/{id}/recipe:
+    get:
+      tags: [items]
+      summary: Get an item's current recipe (FR-006)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Recipe lines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecipeLine'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /items/{id}/recipe/{ingredient_id}:
+    put:
+      tags: [items]
+      summary: Upsert one recipe line's quantity (FR-006, FR-007)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - name: ingredient_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  $ref: '#/components/schemas/DecimalString'
+      responses:
+        '200':
+          description: Updated recipe line
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeLine'
+        '404':
+          description: Item or ingredient not found for this shop
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [items]
+      summary: Remove one recipe line
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - name: ingredient_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Removed
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /purchases:
+    get:
+      tags: [purchases]
+      summary: List ingredient purchases (FR-009)
+      parameters:
+        - name: ingredient_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Purchase history — immutable once recorded (FR-012)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Purchase'
+    post:
+      tags: [purchases]
+      summary: Record an ingredient purchase (FR-009, FR-010, FR-011)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseCreate'
+      responses:
+        '201':
+          description: >
+            Created purchase. If this is the ingredient's most recent purchase,
+            ingredients.current_unit_cost is recomputed in the same transaction.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Purchase'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /sales:
+    get:
+      tags: [sales]
+      summary: List sales (FR-013)
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: >
+            Sales with their line items, each carrying its permanently snapshotted
+            unit_price and unit_production_cost (FR-014, FR-015).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sale'
+    post:
+      tags: [sales]
+      summary: Record a sale of one or more items (FR-013, FR-014)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaleCreate'
+      responses:
+        '201':
+          description: Created sale
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+        '422':
+          description: >
+            Validation failure, including a recipe ingredient with no recorded cost yet
+            (code `ingredient_cost_missing`) — the entire sale is rejected, no partial write.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /reports/summary:
+    get:
+      tags: [reports]
+      summary: Revenue/COGS/gross-profit summary and trend for a date range (FR-016, FR-017, FR-018)
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: >
+            Summary totals and per-period trend. Computed from immutable sale_items
+            snapshots, so a past range's figures never drift (FR-018, SC-006); the bot's
+            /report command uses the identical underlying query.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSummary'
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Signed, HttpOnly session cookie set by POST /auth/telegram.
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  responses:
+    Unauthenticated:
+      description: No valid session
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource does not exist, or belongs to another shop (FR-002, SC-007)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Input failed server-side validation; no write occurred
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    DecimalString:
+      type: string
+      description: >
+        Fixed-precision decimal encoded as a JSON string (e.g. "12.5000"), never a bare
+        JSON number, to prevent float64 rounding on the wire (FR-020).
+      pattern: '^-?\d+(\.\d+)?$'
+      example: "12.5000"
+
+    Error:
+      type: object
+      required: [error, code]
+      properties:
+        error:
+          type: string
+          description: Human-readable message
+        code:
+          type: string
+          description: Machine-readable slug, e.g. invalid_quantity, duplicate_name, ingredient_cost_missing
+
+    TelegramAuthRequest:
+      type: object
+      required: [id, auth_date, hash]
+      description: Payload as returned by the Telegram Login Widget, forwarded as-is.
+      properties:
+        id:
+          type: integer
+          format: int64
+        first_name:
+          type: string
+        username:
+          type: string
+        auth_date:
+          type: integer
+          format: int64
+        hash:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        telegram_id:
+          type: integer
+          format: int64
+        display_name:
+          type: string
+          nullable: true
+        username:
+          type: string
+          nullable: true
+
+    Ingredient:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        unit_of_measure:
+          type: string
+        current_unit_cost:
+          allOf:
+            - $ref: '#/components/schemas/DecimalString'
+          nullable: true
+          description: Null until the ingredient's first purchase is recorded.
+        is_archived:
+          type: boolean
+
+    IngredientCreate:
+      type: object
+      required: [name, unit_of_measure]
+      properties:
+        name:
+          type: string
+        unit_of_measure:
+          type: string
+
+    IngredientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        unit_of_measure:
+          type: string
+
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        sale_price:
+          $ref: '#/components/schemas/DecimalString'
+        is_archived:
+          type: boolean
+
+    ItemCreate:
+      type: object
+      required: [name, sale_price]
+      properties:
+        name:
+          type: string
+        sale_price:
+          $ref: '#/components/schemas/DecimalString'
+
+    ItemUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        sale_price:
+          $ref: '#/components/schemas/DecimalString'
+
+    RecipeLine:
+      type: object
+      properties:
+        ingredient_id:
+          type: integer
+          format: int64
+        ingredient_name:
+          type: string
+        quantity:
+          $ref: '#/components/schemas/DecimalString'
+
+    Purchase:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        ingredient_id:
+          type: integer
+          format: int64
+        quantity:
+          $ref: '#/components/schemas/DecimalString'
+        total_cost:
+          $ref: '#/components/schemas/DecimalString'
+        unit_cost:
+          $ref: '#/components/schemas/DecimalString'
+        purchase_date:
+          type: string
+          format: date
+        notes:
+          type: string
+          nullable: true
+
+    PurchaseCreate:
+      type: object
+      required: [ingredient_id, quantity, total_cost]
+      properties:
+        ingredient_id:
+          type: integer
+          format: int64
+        quantity:
+          $ref: '#/components/schemas/DecimalString'
+        total_cost:
+          $ref: '#/components/schemas/DecimalString'
+        purchase_date:
+          type: string
+          format: date
+          description: Defaults to today if omitted.
+        notes:
+          type: string
+
+    SaleItem:
+      type: object
+      properties:
+        item_id:
+          type: integer
+          format: int64
+        quantity:
+          $ref: '#/components/schemas/DecimalString'
+        unit_price:
+          allOf:
+            - $ref: '#/components/schemas/DecimalString'
+          description: Snapshot of items.sale_price at sale time (FR-014).
+        unit_production_cost:
+          allOf:
+            - $ref: '#/components/schemas/DecimalString'
+          description: Snapshot computed from the recipe and ingredient costs at sale time (FR-014, FR-015).
+
+    Sale:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sold_at:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum: [telegram, dashboard]
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaleItem'
+
+    SaleCreate:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [item_id, quantity]
+            properties:
+              item_id:
+                type: integer
+                format: int64
+              quantity:
+                $ref: '#/components/schemas/DecimalString'
+
+    ReportPeriod:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        revenue:
+          $ref: '#/components/schemas/DecimalString'
+        cogs:
+          $ref: '#/components/schemas/DecimalString'
+        gross_profit:
+          $ref: '#/components/schemas/DecimalString'
+
+    ReportSummary:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        revenue:
+          $ref: '#/components/schemas/DecimalString'
+        cogs:
+          $ref: '#/components/schemas/DecimalString'
+        gross_profit:
+          $ref: '#/components/schemas/DecimalString'
+        trend:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportPeriod'
