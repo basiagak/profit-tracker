@@ -81,13 +81,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copy compose file to droplet
+      - name: Copy compose file and nginx config to droplet
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          source: "docker-compose.prod.yml"
+          source: "docker-compose.prod.yml,nginx/"
           target: "~/profit-tracker"
           strip_components: 0
 
