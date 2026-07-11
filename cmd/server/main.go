@@ -73,6 +73,7 @@ func run() error {
 	sessions := api.NewSessionManager(cfg.SessionSecret, false)
 
 	e := api.NewEcho(nil)
+	handlers.NewHealthHandler(sqlDB).Register(e)
 	groups := api.NewRouteGroups(e, sessions.Middleware())
 	handlers.NewAuthHandler(cfg.TelegramToken, users, sessions).Register(groups.Auth, groups.Protected)
 	handlers.NewIngredientsHandler(catalog).Register(groups.Protected)
