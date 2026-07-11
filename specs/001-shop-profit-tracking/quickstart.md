@@ -4,7 +4,7 @@ Validation guide for proving the feature works end-to-end. Not implementation co
 
 ## Prerequisites
 
-- Go 1.23+
+- Go 1.25+
 - PostgreSQL 15+ running locally (or via Docker) and reachable via a DSN
 - A Telegram bot token (create via [@BotFather](https://t.me/BotFather)) for local testing of `/start`, `/ingredient`, `/item`, `/purchase`, `/sale`, `/report`
 - `golang-migrate` CLI (or the project's wrapped `go run` migration command, once implemented) to apply `migrations/`
@@ -14,11 +14,15 @@ Validation guide for proving the feature works end-to-end. Not implementation co
 ## Setup
 
 ```bash
-# 1. Configure environment
+# 1. Configure environment — either export the variables directly:
 export DATABASE_URL="postgres://user:pass@localhost:5432/profit_tracker?sslmode=disable"
 export TELEGRAM_BOT_TOKEN="<token from BotFather>"
 export SESSION_SECRET="<random 32+ byte secret>"
 export HTTP_ADDR=":8080"
+# ...or copy .env.example to .env and fill it in — cmd/server loads it automatically
+# via godotenv.Load() on startup, falling back to the real environment if no
+# .env file is present (so this step is a no-op in production).
+cp .env.example .env
 
 # 2. Apply schema migrations
 migrate -database "$DATABASE_URL" -path migrations up
@@ -34,8 +38,8 @@ Since `POST /api/auth/telegram` expects a Telegram Login Widget payload (which n
 ## Automated tests
 
 ```bash
-go test ./...                     # unit tests (internal/domain, internal/service, internal/telegram handlers)
-go test ./tests/integration/...   # testcontainers-backed repository/service tests against real Postgres
+go test ./...                                    # unit tests (internal/domain, internal/service, internal/telegram handlers)
+go test -tags=integration ./tests/integration/... # testcontainers-backed repository/service tests against real Postgres (needs Docker)
 ```
 
 ## Manual validation scenarios
@@ -44,12 +48,18 @@ Each scenario maps to an acceptance scenario in `spec.md`; run them in order aga
 
 ### 1. Set up shop catalog (User Story 1)
 
+Telegram catalog commands take names as single, space-free tokens (e.g.
+`BreadLoaf`, not `"Bread Loaf"`) — `contracts/telegram-commands.md` leaves
+"exact tokenizer choice" as an implementation detail, and this codebase
+resolves it without a quoting grammar; use the JSON API directly if you need
+a name containing spaces.
+
 1. In Telegram, send `/start` to the bot → confirms shop auto-provisioned.
 2. `/ingredient add Flour kg` → appears via `/ingredient list`.
-3. `/item add "Bread Loaf" 5.00` → appears via `/item list`.
-4. `/item recipe "Bread Loaf" Flour 0.5` → recipe set.
-5. `/ingredient archive Flour` → still shows in `/item recipe` history for "Bread Loaf" but no longer offered when starting a *new* recipe/purchase.
-6. From a second Telegram account, attempt `/ingredient list` → sees only that account's own (empty) catalog, never the first account's "Flour"/"Bread Loaf".
+3. `/item add BreadLoaf 5.00` → appears via `/item list`.
+4. `/item recipe BreadLoaf Flour 0.5` → recipe set.
+5. `/ingredient archive Flour` → still shows in `/item recipe` history for BreadLoaf but no longer offered when starting a *new* recipe/purchase.
+6. From a second Telegram account, attempt `/ingredient list` → sees only that account's own (empty) catalog, never the first account's Flour/BreadLoaf.
 
 **Expected**: catalog entities scoped per shop; archive hides from new-entry flows but preserves history; cross-shop access denied (FR-002, FR-005).
 
@@ -63,9 +73,9 @@ Each scenario maps to an acceptance scenario in `spec.md`; run them in order aga
 
 ### 3. Record a sale with locked-in cost (User Story 3)
 
-1. With "Bread Loaf" recipe = 0.5kg Flour at `current_unit_cost = 3.0000`, send `/sale "Bread Loaf" 2`.
+1. With BreadLoaf's recipe = 0.5kg Flour at `current_unit_cost = 3.0000`, send `/sale BreadLoaf 2`.
 2. Reply should show `unit_production_cost = 1.5000` per loaf (0.5 × 3.0000) and `unit_price = 5.00`, confirmed within a few seconds.
-3. Now record another purchase that changes Flour's `current_unit_cost` (e.g., `/purchase Flour 10 50.00`) and edit the recipe (`/item recipe "Bread Loaf" Flour 0.75`).
+3. Now record another purchase that changes Flour's `current_unit_cost` (e.g., `/purchase Flour 10 50.00`) and edit the recipe (`/item recipe BreadLoaf Flour 0.75`).
 4. Re-query the original sale (via `curl -b cookies.txt "http://localhost:8080/api/sales?from=...&to=..."` or a report for that date) → its stored `unit_production_cost` is still `"1.5000"`, unchanged by step 3.
 
 **Expected**: production cost (and price) snapshot is permanent; later cost/recipe edits never retroactively change a past sale (FR-008, FR-014, FR-015).

@@ -4,6 +4,8 @@ All commands require the sender's Telegram account to resolve to a `users` row; 
 
 Argument syntax: `<required>`, `[optional]`. Free-text arguments (names, notes) containing spaces should be the last argument or the implementation should support quoting; exact tokenizer choice is an implementation detail, not a contract concern.
 
+**Implementation note**: this codebase's tokenizer (`internal/telegram/handlers_catalog.go`) resolves that choice by splitting on whitespace with no quoting grammar, so every ingredient/item name and unit in `/ingredient`, `/item`, and `/item recipe` must be a single, space-free token (e.g. `BreadLoaf`, not `Bread Loaf`). Names containing spaces are only reachable via the JSON API (`contracts/web-api.yaml`), which takes them as regular JSON string fields.
+
 ## /start
 
 `/start`

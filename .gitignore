@@ -1,3 +1,5 @@
 .claude/
 .specify/
 .DS_Store
+bin/*
+.env

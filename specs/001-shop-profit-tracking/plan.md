@@ -14,13 +14,13 @@ Technical approach: a single Go service exposes two front doors — a long-polli
 
 ## Technical Context
 
-**Language/Version**: Go 1.23
+**Language/Version**: Go 1.25
 
-**Primary Dependencies**: GORM (`gorm.io/gorm`, `gorm.io/driver/postgres`) for persistence; `go-telegram-bot-api/v5` (long polling) for the Telegram bot; Echo (`github.com/labstack/echo/v4`) as the HTTP router/middleware layer for a JSON-only REST API (`c.JSON`, no `html/template`, no server-rendered views); `shopspring/decimal` for fixed-precision money/quantity math; `golang-migrate/migrate` for versioned SQL schema migrations.
+**Primary Dependencies**: GORM (`gorm.io/gorm`, `gorm.io/driver/postgres`) for persistence; `go-telegram-bot-api/v5` (long polling) for the Telegram bot; Echo (`github.com/labstack/echo/v4`) as the HTTP router/middleware layer for a JSON-only REST API (`c.JSON`, no `html/template`, no server-rendered views); `shopspring/decimal` for fixed-precision money/quantity math; `golang-migrate/migrate` for versioned SQL schema migrations; `joho/godotenv` to load a local `.env` file in development (never required in production, where real environment variables are set directly).
 
 **Storage**: PostgreSQL 15+, `NUMERIC` columns for all monetary/quantity values, `TIMESTAMPTZ` for all timestamps.
 
-**Testing**: `go test` + `testify` for unit tests; `testcontainers-go` (Postgres module) for repository/integration tests against a real database; `net/http/httptest` driving Echo's `e.ServeHTTP` for web handler tests; an interface-mocked Telegram Bot API for bot command-handler unit tests.
+**Testing**: `go test` + `testify` for unit tests; `testcontainers-go` (Postgres module) for repository/integration tests against a real database, gated behind an `integration` build tag (`go test -tags=integration ./tests/integration/...`) so the default `go test ./...` needs no Docker; `net/http/httptest` driving Echo's `e.ServeHTTP` for web handler tests; an interface-mocked Telegram Bot API for bot command-handler unit tests.
 
 **Target Platform**: Linux server, single self-contained Go binary (bot + dashboard + migrations run from one process/deployment artifact).
 

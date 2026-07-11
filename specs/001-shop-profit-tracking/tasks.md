@@ -57,7 +57,7 @@ Single Go project per `plan.md`'s Project Structure — `cmd/`, `internal/`, `mi
 - [X] T015 [P] internal/api/session.go: signed, `HttpOnly`, `SameSite=Lax` session cookie issue/verify helpers keyed by `SESSION_SECRET` (research.md §5)
 - [X] T016 internal/api/handlers/auth.go: Telegram Login Widget `hash` verification (HMAC-SHA256 per Telegram's algorithm) + `POST /api/auth/telegram`, `POST /api/auth/logout`, `GET /api/me` handlers per `contracts/web-api.yaml`, depends on T013–T015
 - [X] T017 [P] internal/telegram/bot.go: bot command dispatcher skeleton + `/start` (auto-provision via T013) + `/help`, depends on T013
-- [ ] T018 cmd/server/main.go: wire config (T004), connect GORM to Postgres, apply/verify migrations (T006), start the Echo server (T014/T016) and the Telegram long-polling loop (T017) concurrently with graceful shutdown
+- [X] T018 cmd/server/main.go: wire config (T004), connect GORM to Postgres, apply/verify migrations (T006), start the Echo server (T014/T016) and the Telegram long-polling loop (T017) concurrently with graceful shutdown
 
 **Checkpoint**: Foundation ready — a Telegram account can `/start` (or `POST /api/auth/telegram`) and get an authenticated shop; user story implementation can now begin.
 
@@ -71,18 +71,18 @@ Single Go project per `plan.md`'s Project Structure — `cmd/`, `internal/`, `mi
 
 ### Tests for User Story 1
 
-- [ ] T019 [P] [US1] Integration test (testcontainers): ingredient create/list/update/archive + cross-shop access denied (404) in tests/integration/catalog_ingredient_test.go
-- [ ] T020 [P] [US1] Integration test (testcontainers): item create/list/update/archive, recipe upsert/list/delete, and archiving an ingredient still referenced by an active recipe succeeds with a warning in tests/integration/catalog_item_test.go
+- [X] T019 [P] [US1] Integration test (testcontainers): ingredient create/list/update/archive + cross-shop access denied (404) in tests/integration/catalog_ingredient_test.go
+- [X] T020 [P] [US1] Integration test (testcontainers): item create/list/update/archive, recipe upsert/list/delete, and archiving an ingredient still referenced by an active recipe succeeds with a warning in tests/integration/catalog_item_test.go
 
 ### Implementation for User Story 1
 
-- [ ] T021 [P] [US1] internal/repository/ingredient_repo.go: `Create`, `List` (with `includeArchived`), `Get`, `Update`, `SetArchived` — every method scoped by `userID`
-- [ ] T022 [P] [US1] internal/repository/item_repo.go: `Create`, `List`, `Get`, `Update`, `SetArchived` for items, plus `UpsertRecipeLine`, `ListRecipe`, `DeleteRecipeLine` for `item_ingredients` — every method scoped by `userID`
-- [ ] T023 [US1] internal/service/catalog_service.go: `CatalogService` orchestrating ingredient/item/recipe validation (duplicate active name → `409`, quantity/price rules) and the archive-while-referenced warning, depends on T021, T022
-- [ ] T024 [US1] internal/telegram/handlers_catalog.go: `/ingredient add|list|archive`, `/item add|list|archive`, `/item recipe` commands per `contracts/telegram-commands.md`, depends on T023
-- [ ] T025 [US1] internal/api/handlers/ingredients.go: `GET/POST /api/ingredients`, `PATCH /api/ingredients/{id}`, `POST /api/ingredients/{id}/archive` per `contracts/web-api.yaml`, depends on T023
-- [ ] T026 [US1] internal/api/handlers/items.go: `GET/POST /api/items`, `PATCH /api/items/{id}`, `POST /api/items/{id}/archive`, `GET /api/items/{id}/recipe`, `PUT/DELETE /api/items/{id}/recipe/{ingredient_id}` per `contracts/web-api.yaml`, depends on T023
-- [ ] T027 [US1] Register the ingredients and items route groups in internal/api/router.go, depends on T025, T026
+- [X] T021 [P] [US1] internal/repository/ingredient_repo.go: `Create`, `List` (with `includeArchived`), `Get`, `Update`, `SetArchived` — every method scoped by `userID`
+- [X] T022 [P] [US1] internal/repository/item_repo.go: `Create`, `List`, `Get`, `Update`, `SetArchived` for items, plus `UpsertRecipeLine`, `ListRecipe`, `DeleteRecipeLine` for `item_ingredients` — every method scoped by `userID`
+- [X] T023 [US1] internal/service/catalog_service.go: `CatalogService` orchestrating ingredient/item/recipe validation (duplicate active name → `409`, quantity/price rules) and the archive-while-referenced warning, depends on T021, T022
+- [X] T024 [US1] internal/telegram/handlers_catalog.go: `/ingredient add|list|archive`, `/item add|list|archive`, `/item recipe` commands per `contracts/telegram-commands.md`, depends on T023
+- [X] T025 [US1] internal/api/handlers/ingredients.go: `GET/POST /api/ingredients`, `PATCH /api/ingredients/{id}`, `POST /api/ingredients/{id}/archive` per `contracts/web-api.yaml`, depends on T023
+- [X] T026 [US1] internal/api/handlers/items.go: `GET/POST /api/items`, `PATCH /api/items/{id}`, `POST /api/items/{id}/archive`, `GET /api/items/{id}/recipe`, `PUT/DELETE /api/items/{id}/recipe/{ingredient_id}` per `contracts/web-api.yaml`, depends on T023
+- [X] T027 [US1] Register the ingredients and items route groups in internal/api/router.go, depends on T025, T026
 
 **Checkpoint**: User Story 1 is fully functional and testable independently via both Telegram and the API.
 
