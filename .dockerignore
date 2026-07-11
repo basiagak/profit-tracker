@@ -1,0 +1,9 @@
+.git
+.github
+.claude
+.specify
+bin
+tests
+*.md
+.env
+.env.example
