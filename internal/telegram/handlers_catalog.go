@@ -56,7 +56,7 @@ func itemCommandHandler(catalog *service.CatalogService) CommandHandler {
 	return func(ctx *CommandContext) (string, error) {
 		fields := strings.Fields(ctx.Args)
 		if len(fields) == 0 {
-			return "", fmt.Errorf("usage: /item add <name> <price> | list | archive <name> | recipe ...")
+			return "", fmt.Errorf("usage: /item add <name> <price> | list | archive <name> | recipe <item-name> <ingredient-name> <quantity>")
 		}
 
 		switch strings.ToLower(fields[0]) {

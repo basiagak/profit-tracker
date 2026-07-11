@@ -1,17 +1,31 @@
-run:
-  timeout: 5m
-
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
-    - gofmt
-    - govet
     - errcheck
+    - govet
+    - ineffassign
     - staticcheck
     - unused
-    - ineffassign
-    - gosimple
-
-issues:
-  exclude-dirs:
-    - tests
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - tests
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - tests
+      - third_party$
+      - builtin$
+      - examples$

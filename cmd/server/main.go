@@ -19,7 +19,6 @@ import (
 	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/joho/godotenv"
-	"github.com/labstack/echo/v4"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -74,12 +73,7 @@ func run() error {
 	sessions := api.NewSessionManager(cfg.SessionSecret, false)
 
 	e := api.NewEcho(nil)
-	// TEMP: auth disabled for local API testing without a Telegram login.
-	// Every request is attributed to a fixed dummy shop (telegram_id 0)
-	// instead of verifying a session cookie. Revert to sessions.Middleware()
-	// before deploying.
 	groups := api.NewRouteGroups(e, sessions.Middleware())
-	// groups := api.NewRouteGroups(e, devBypassAuthMiddleware(users))
 	handlers.NewAuthHandler(cfg.TelegramToken, users, sessions).Register(groups.Auth, groups.Protected)
 	handlers.NewIngredientsHandler(catalog).Register(groups.Protected)
 	handlers.NewItemsHandler(catalog).Register(groups.Protected)
@@ -127,26 +121,6 @@ func run() error {
 	}
 	log.Println("shutdown complete")
 	return nil
-}
-
-// devBypassAuthMiddleware is a TEMPORARY stand-in for sessions.Middleware()
-// that skips cookie verification entirely and attributes every request to a
-// fixed dummy shop, so /api/* routes are reachable without a Telegram login
-// during local testing. It still sets the same "user_id" context key
-// UserIDFromContext reads, so handlers work unmodified. Remove this and
-// restore sessions.Middleware() before deploying.
-func devBypassAuthMiddleware(users *repository.UserRepository) echo.MiddlewareFunc {
-	const devTelegramID = 0
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			user, err := users.FindOrCreateByTelegramID(devTelegramID, nil, nil)
-			if err != nil {
-				return err
-			}
-			c.Set("user_id", user.ID)
-			return next(c)
-		}
-	}
 }
 
 // applyMigrations runs every pending migration embedded in the migrations

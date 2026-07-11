@@ -57,13 +57,13 @@ func (d *Decimal) Scan(value interface{}) error {
 
 // Value implements driver.Valuer.
 func (d Decimal) Value() (driver.Value, error) {
-	return d.Decimal.String(), nil
+	return d.String(), nil
 }
 
 // MarshalJSON encodes the decimal as a JSON string (never a bare number),
 // so wire-format cannot reintroduce float rounding (FR-020).
 func (d Decimal) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + d.Decimal.String() + `"`), nil
+	return []byte(`"` + d.String() + `"`), nil
 }
 
 // UnmarshalJSON decodes a JSON string (or bare number, for tolerance) into a Decimal.
